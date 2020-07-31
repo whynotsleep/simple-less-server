@@ -5,8 +5,8 @@ const url = require('url')
 const querystring = require('querystring')
 const {
   dateFormat,
-  isFunction,
   isObject,
+  isFunction,
   isRegExp
 } = require('./utils.js')
 let config = require('./config.js')
@@ -17,89 +17,71 @@ class SimpleServer {
     this.config = Object.assign({}, config, customConfig)
     this.request = null
     this.response = null
+    this.lessRoutesCache = []
     this.lessRoutes = []
 
     for (let k in this.config) {
       this[k] = this.config[k]
     }
-    this.lessRoutesInit()
-    this.middleware = new Middleware()
+    this.init()
+  }
+
+  init() {
+    this.mainProcessMiddleware = new Middleware()
+
+    this.use(async (ctx, next) => {
+      return await this.acceptRequest(ctx, next)
+    })
+
+    this.use(async (ctx, next) => {
+      return await this.matchStatic(ctx, next)
+    })
+
+    this.use(async (ctx, next) => {
+      return await this.matchProxy(ctx, next)
+    })
+
+    this.use(async (ctx, next) => {
+      return await this.matchLessRoute(ctx, next)
+    })
+
+    return this
   }
 
   use(fn) {
-    if(!this.middleware) {
-      throw new Error('Missing Middleware')
+    if (!this.mainProcessMiddleware) {
+      throw new Error('Missing mainProcessMiddleware')
     }
-    this.middlewares.push(fn)
+    this.mainProcessMiddleware.use(fn)
+    return this
+  }
+
+  routeUse(path, func) {
+    this.lessRoutesCache.push({
+      path,
+      func
+    })
+    return this
   }
 
   send(data, statusCode, statusMessage, encoding) {
     this.response.statusCode = statusCode || 200
     this.response.statusMessage = statusMessage || ''
     this.response.end(data, encoding)
+    return this
   }
 
-  /**
-   * 初始化路由正则匹配
-   */
-  lessRoutesInit() {
-    if (Array.isArray(this.lessRoutes) && this.lessRoutes.length > 0) {
-      this.lessRoutes = this.lessRoutes.map(item => {
-        return {
-          url: item.url,
-          regExp: isRegExp(item.url) ? item.url : new RegExp('^' + item.url + '$'),
-          fun: item.fun,
-          simple: item.simple === undefined ? true : Boolean(simple)
-        }
-      })
+  status(code = 200) {
+    this.response.statusCode = code
+    if (code == 404) {
+      this.response.statusMessage = 'not Found'
     }
+    return this
   }
 
-  /**
-   * 如果有路由匹配项就处理返回
-   * @param {*} request 
-   * @param {*} response 
-   */
-  matchLessRoute(request, response) {
-    let lessRoutes = this.lessRoutes
-    let url = request.url
-
-    for (let i = 0, len = lessRoutes.length; i < len; i++) {
-      if (lessRoutes[i].regExp.test(url)) {
-        this.sendMatchedLessRoute(request, response, lessRoutes[i])
-        return true
-      }
-    }
-    return false
-  }
-
-  /**
-   * 根据匹配到的路由对象，返回结果
-   * @param {*} request 
-   * @param {*} response 
-   */
-  async sendMatchedLessRoute(request, response, route) {
-    let {
-      simple,
-      fun
-    } = route
-
-    try {
-      if (isFunction(fun)) {
-        if (simple) {
-          let data = await fun(request)
-
-          this.send(JSON.stringify(data))
-        } else {
-          fun(request, response)
-        }
-      } else {
-        this.send(JSON.stringify(fun))
-      }
-    } catch (err) {
-      console.error(err)
-      this.send('', 500, err.message)
-    }
+  json(data) {
+    this.response.body = JSON.stringify(data)
+    return this
   }
 
   /**
@@ -108,24 +90,26 @@ class SimpleServer {
    * @param {*} response 
    */
   openProxyRequest(request, response, option) {
-    let proxyRequest = http.request(option, proxyResponse => {
-      let data = ''
+    return new Promise((resolve, reject) => {
+      let proxyRequest = http.request(option, proxyResponse => {
+        let data = []
 
-      proxyResponse.on('data', (chunk) => {
-        data += chunk
+        proxyResponse.on('data', (chunk) => {
+          data.push(chunk)
+        })
+        proxyResponse.on('end', () => {
+          response.body = data.join('')
+          resolve()
+        })
+        response.writeHead(proxyResponse.statusCode, proxyResponse.headers)
       })
-      proxyResponse.on('end', () => {
-        this.send(data)
+
+      proxyRequest.end(request.body, 'binary')
+
+      proxyRequest.on('error', (err) => {
+        reject(err)
       })
-      response.writeHead(proxyResponse.statusCode, proxyResponse.headers)
     })
-
-    proxyRequest.end(request.body, 'binary')
-
-    proxyRequest.on('error', (err) => {
-      this.send('', 502, err.message)
-    })
-    return proxyRequest
   }
 
   /**
@@ -178,114 +162,213 @@ class SimpleServer {
 
   /**
    * 代理请求
-   * @param {*} request 
-   * @param {*} response 
+   * @param {*} ctx 
+   * @param {*} next 
    */
-  matchProxy(request, response) {
+  async matchProxy(ctx, next) {
+    let {
+      request,
+      response
+    } = ctx
     let proxyConfig = this.proxyConfig
     let url = request.url
+
 
     for (let regStr in proxyConfig) {
       let reg = new RegExp(regStr)
 
       if (reg.test(url)) {
         let option = this.getProxyOption(proxyConfig[regStr], request)
-        this.openProxyRequest(request, response, option)
-        return true
+        return await this.openProxyRequest(request, response, option)
       }
     }
-    return false
+    return await next()
+  }
+
+  /**
+   * 接收请求数据
+   * @param {*} request 
+   */
+  acceptRequestData(request) {
+    return new Promise((resolve, reject) => {
+      let data = []
+      request.on('data', chunk => {
+        data.push(chunk)
+      })
+
+      request.on('end', () => {
+        resolve(data.join(''))
+      })
+      request.on('error', (err) => {
+        reject(err)
+      })
+    })
+  }
+
+  /**
+   * 格式化请求参数
+   * @param {*} ctx 
+   * @param {*} next 
+   */
+  async acceptRequest(ctx, next) {
+    let request = ctx.request
+    let urlObj = url.parse(request.url, true)
+
+    try {
+      for (let k in urlObj) {
+        if (urlObj.hasOwnProperty(k)) {
+          request[k] = urlObj[k]
+        }
+      }
+
+      let data = await this.acceptRequestData(ctx.request)
+
+      request.body = data
+      request.params = querystring.parse(data)
+      return await next()
+    } catch (err) {
+      console.error(err)
+      return err
+    }
+  }
+
+  async readFile(response, filepath) {
+    return new Promise((resolve, reject) => {
+      try {
+        let stat = fs.statSync(filepath)
+
+        // 检查路径是否是文件，是就继续读取流
+        if (stat.isFile()) {
+          let readStream = fs.createReadStream(filepath, {
+            // encoding: 'binary'
+          })
+
+          readStream.pipe(response)
+          readStream.on('error', err => {
+            reject(err)
+          })
+        } else {
+          reject(err)
+        }
+      } catch (err) {
+        reject(err)
+      }
+    })
   }
 
   /**
    * 静态资源请求
-   * @param {*} request 
-   * @param {*} response 
+   * @param {*} ctx 
+   * @param {*} next 
    */
-  matchStatic(request, response) {
+  async matchStatic(ctx, next) {
     let staticPath = this.staticPath
-    let url = request.url
-    let filePath = ''
+    let filepath = ctx.request.path
 
-    if (url === '/') {
-      filePath = path.join(staticPath, '/index.html')
+    if (filepath === '/') {
+      filepath = path.join(staticPath, '/index.html')
     } else {
-      filePath = path.join(staticPath, url)
+      filepath = path.join(staticPath, filepath)
     }
 
     try {
-      // 检查文件是否存在，存在就继续读取流
-      fs.accessSync(filePath, fs.constants.F_OK);
-
-      let stream = fs.createReadStream(filePath, {
-        // encoding: 'utf8'
-      })
-      stream.pipe(response)
-      stream.on('error', error => {
-        this.send('', 500, error.message)
-      })
-      return true
-    } catch (err) {}
-    return false
+      return await this.readFile(ctx.response, filepath)
+    } catch (err) {
+      // console.error(err)
+    }
+    return await next()
   }
 
-  acceptRequest(request, response, next) {
-    let data = ''
-    request.on('data', chunk => {
-      data += chunk
+  /**
+   * 初始化路由正则匹配
+   */
+  lessRoutesInit() {
+    this.routeUse(/^.*$/, async (request, response) => {
+      response.statusCode = 404
+      response.statusMessage = 'not Found'
+      try {
+        await this.readFile(response, path.join(__dirname, './404.html'))
+      } catch (err) {
+        response.statusCode = 'The page not Found'
+      }
     })
-    request.on('end', () => {
-      request.body = data
-      let params = querystring.parse(data.toString())
-      request.params = params
-      next(request, response)
-    })
+
+    if (Array.isArray(this.lessRoutesCache) && this.lessRoutesCache.length > 0) {
+      this.lessRoutes = this.lessRoutesCache.map(item => {
+        let {
+          path,
+          func
+        } = item
+
+        return {
+          path,
+          regExp: isRegExp(path) ? path : new RegExp('^' + path + '$'),
+          func
+        }
+      })
+    }
+  }
+
+  /**
+   * 如果有路由匹配项就处理返回
+   * @param {*} ctx 
+   * @param {*} next 
+   */
+  async matchLessRoute(ctx, next) {
+    let lessRoutes = this.lessRoutes
+    let {
+      request,
+      response
+    } = ctx
+
+    for (let i = 0, len = lessRoutes.length; i < len; i++) {
+      let {
+        regExp,
+        func
+      } = lessRoutes[i]
+
+      if (regExp.test(request.pathname)) {
+        if (isFunction(func)) {
+          return await func(request, response)
+        } else {
+          return Promise.resolve()
+        }
+      }
+    }
+    return await next()
   }
 
   start() {
     let {
       log,
       port,
-      proxyOpen
     } = this
+
+    this.lessRoutesInit()
+
     const server = http.createServer((request, response) => {
       this.request = request
       this.response = response
-
-      try {
-        let urlObj = url.parse(request.url, true)
-
-        for (let k in urlObj) {
-          if (urlObj.hasOwnProperty(k)) {
-            request[k] = urlObj[k]
-          }
-        }
-
-        if (log) {
-          console.log(dateFormat(), '\x1B[32m', request.url, '\x1B[39m')
-        }
-
-        if (this.matchStatic(request, response)) {
-          return
-        }
-
-        this.acceptRequest(request, response, () => {
-          if (this.matchLessRoute(request, response)) {
-            return
-          }
-
-          if (proxyOpen) {
-            if (this.matchProxy(request, response)) {
-              return
-            }
-          }
-          this.send('404', 404, 'not Found')
-        })
-
-      } catch (err) {
-        console.error(err)
-        this.send('500', 500, err.message)
+      this.ctx = {
+        request,
+        response
       }
+
+      if (log) {
+        console.log(dateFormat(), '\x1B[32m', request.url, '\x1B[39m')
+      }
+
+      request.on('error', err => {
+        this.send(err.message, 500)
+      })
+
+      this.mainProcessMiddleware.hander(this.ctx).then(res => {
+          this.response.end(this.response.body)
+        })
+        .catch(err => {
+          console.error(err)
+          this.send(err.message, 500)
+        })
     })
 
     this.server = server
