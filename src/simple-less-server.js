@@ -12,7 +12,18 @@ const {
 let config = require('./config.js')
 const Middleware = require('./middleware.js')
 
-class SimpleServer {
+function json(data) {
+  this.body = JSON.stringify(data)
+}
+
+function status(code = 200) {
+  this.statusCode = code
+  if (code == 404) {
+    this.statusMessage = 'not Found'
+  }
+}
+
+class SimpleLessServer {
   constructor(customConfig) {
     this.config = Object.assign({}, config, customConfig)
     this.request = null
@@ -349,6 +360,10 @@ class SimpleServer {
     const server = http.createServer((request, response) => {
       this.request = request
       this.response = response
+
+      response.status = status.bind(response)
+      response.json = json.bind(response)
+
       this.ctx = {
         request,
         response
@@ -381,4 +396,4 @@ class SimpleServer {
   }
 }
 
-module.exports = SimpleServer
+module.exports = SimpleLessServer

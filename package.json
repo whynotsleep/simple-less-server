@@ -1,0 +1,24 @@
+{
+  "name": "simple-less-server",
+  "version": "1.0.0",
+  "description": "A simple server for developing static pages. You can enable proxy requests, or you can customize requests to return data",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whynotsleep/simple-less-server.git"
+  },
+  "keywords": [
+    "nodeserver",
+    "proxy-server",
+    "static-website"
+  ],
+  "author": "whynotsleep",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/whynotsleep/simple-less-server/issues"
+  },
+  "homepage": "https://github.com/whynotsleep/simple-less-server#readme"
+}
