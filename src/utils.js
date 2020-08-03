@@ -1,3 +1,5 @@
+const getMediaType = require('./mediatype.js')
+
 function dateFormat(fmt = 'yyyy-MM-dd hh:mm:ss', date = new Date()) {
 
   let o = {
@@ -31,9 +33,17 @@ function isRegExp(param) {
   return Object.prototype.toString.call(param) === '[object RegExp]'
 }
 
+
+function getContentType(suffix, encoding = 'charset=UTF-8') {
+  let type = getMediaType(suffix)
+
+  return encoding ? type + ';' + encoding : type
+}
+
 module.exports = {
   dateFormat,
   isFunction,
   isObject,
-  isRegExp
+  isRegExp,
+  getContentType
 }

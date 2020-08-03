@@ -7,12 +7,19 @@ const {
   dateFormat,
   isObject,
   isFunction,
-  isRegExp
+  isRegExp,
+  getContentType
 } = require('./utils.js')
 let config = require('./config.js')
 const Middleware = require('./middleware.js')
 
+function setContentType(suffix, encoding) {
+  let type = getContentType(suffix, encoding)
+  this.setHeader('Content-type', type)
+}
+
 function json(data) {
+  this.setContentType('.json')
   this.body = JSON.stringify(data)
 }
 
@@ -22,6 +29,7 @@ function status(code = 200) {
     this.statusMessage = 'not Found'
   }
 }
+
 
 class SimpleLessServer {
   constructor(customConfig) {
@@ -82,19 +90,6 @@ class SimpleLessServer {
     return this
   }
 
-  status(code = 200) {
-    this.response.statusCode = code
-    if (code == 404) {
-      this.response.statusMessage = 'not Found'
-    }
-    return this
-  }
-
-  json(data) {
-    this.response.body = JSON.stringify(data)
-    return this
-  }
-
   /**
    * 打开代理请求
    * @param {*} option 
@@ -139,10 +134,10 @@ class SimpleLessServer {
       method,
       headers
     } = request
-    new RegExp('^(https?\:)\/\/(.+?)(?:\:(\\d+))??$', 'ig').test(target)
-    let protocol = RegExp.$1
-    let host = RegExp.$2
-    let port = RegExp.$3
+    let targetParse = url.parse(target || '')
+    let protocol = targetParse.protocol
+    let host = targetParse.hostname
+    let port = targetParse.port
 
     // 如果存在配置项，就匹配并重写url
     if (isObject(pathRewrite)) {
@@ -184,15 +179,17 @@ class SimpleLessServer {
     let proxyConfig = this.proxyConfig
     let url = request.url
 
+    if (isObject(proxyConfig)) {
+      for (let regStr in proxyConfig) {
+        let reg = new RegExp(regStr)
 
-    for (let regStr in proxyConfig) {
-      let reg = new RegExp(regStr)
-
-      if (reg.test(url)) {
-        let option = this.getProxyOption(proxyConfig[regStr], request)
-        return await this.openProxyRequest(request, response, option)
+        if (reg.test(url)) {
+          let option = this.getProxyOption(proxyConfig[regStr], request)
+          return await this.openProxyRequest(request, response, option)
+        }
       }
     }
+
     return await next()
   }
 
@@ -253,7 +250,9 @@ class SimpleLessServer {
           let readStream = fs.createReadStream(filepath, {
             // encoding: 'binary'
           })
+          let suffix = path.extname(filepath)
 
+          setContentType.call(response, suffix)
           readStream.pipe(response)
           readStream.on('error', err => {
             reject(err)
@@ -339,6 +338,7 @@ class SimpleLessServer {
       } = lessRoutes[i]
 
       if (regExp.test(request.pathname)) {
+        setContentType.call(response, '.txt')
         if (isFunction(func)) {
           return await func(request, response)
         } else {
@@ -349,7 +349,7 @@ class SimpleLessServer {
     return await next()
   }
 
-  start() {
+  start(callback) {
     let {
       log,
       port,
@@ -363,6 +363,7 @@ class SimpleLessServer {
 
       response.status = status.bind(response)
       response.json = json.bind(response)
+      response.setContentType = setContentType.bind(response)
 
       this.ctx = {
         request,
@@ -388,9 +389,11 @@ class SimpleLessServer {
 
     this.server = server
 
-    server.listen(port || 3000, () => {
+    callback = isFunction(callback) ? callback : () => {
       console.log('\x1B[32m%s\x1B[39m', 'The proxy server is running...')
-    })
+    }
+
+    server.listen(port || 3000, callback)
 
     return this
   }

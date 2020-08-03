@@ -4,18 +4,17 @@
 
 A simple server for developing static pages. You can enable proxy requests, or you can customize requests to return data
 
-接受到的请求暂时不会验证请求方法,例如get post patch等
-使用场景是，在开发几个简单的没有太多要求页面的时候，轻松配置一下就可以用服务器打开页面，简单写调用几个方法，就可以模拟真正接口获取数据，方便调试
++ 接受到的请求暂时不会验证请求方法,例如get post patch等
++ 使用场景是，在开发几个简单的没有太多要求页面的时候，轻松配置一下就可以用服务器打开页面，简单写调用几个方法，就可以模拟真正接口获取数据
 
-优先级：
-配置的静态目录 > 配置的代理拦截 > routeUse添加的服务路由 > 最后404
++ 优先级：静态目录 > 代理拦截 > routeUse添加的路由 > 最后404
 
-use:
+## use:
 ```
 let app = server({
   port: 3000, //本地服务器启动端口
   log: true, //是否在控制台打印请求地址
-  staticPath: __dirname, //静态资源目录
+  staticPath: __dirname, //静态资源目录,
   proxyOpen: true, //代理是否开启
   proxyConfig: { //需要代理的目标对象，请求地址有/api都会代理，权重
     '/api': {
@@ -26,9 +25,9 @@ let app = server({
       }
     }
   },
-  lessRoutes: [{ //第一种路由初始化方法
+  lessRoutesCache: [{ //第一种路由初始化方法
     path: '/hello', //路由地址
-    func: (request, response) => {response.body = '直接写在配置项中的路由方法'}
+    func: (request, response) => {response.body = 'hello world!'}
   }] //路由
 })
 
@@ -36,14 +35,27 @@ let app = server({
 // 简单的服务器,将结果写在body上，最后response.end()会把body上的数据写在里面
 // 或者直接用response.json(data)方法格式化传参生成json字符串返回
 app.routeUse('/api/test', (request, response) => {
-    response.body = "The request name is '/api/test'"
+    response.body = "The request name is '"+ request.url +"'"
 })
 app.routeUse('/api/getList', (request, response) => {
     response.status(200)
-    response.json({list: [1,2,3,4,5]})
+    response.json({list: [1, null, true, 'abc', '文字']})
 })
 
 app.start()
 ```
 
+## request
 
+属性
++ url url
++ hostname 域名
++ port 端口
++ path 请求路径
++ query url上的参数
++ params body上的参数
+
+## response
+
+response.status() 设置返回的状态码
+response.json() 设置返回的json字符串
