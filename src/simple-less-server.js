@@ -8,18 +8,18 @@ const {
   isObject,
   isFunction,
   isRegExp,
-  getContentType
+  getMimeType
 } = require('./utils.js')
 let config = require('./config.js')
 const Middleware = require('./middleware.js')
 
-function setContentType(suffix, encoding) {
-  let type = getContentType(suffix, encoding)
+function setMimeType(suffix, encoding) {
+  let type = getMimeType(suffix, encoding)
   this.setHeader('Content-type', type)
 }
 
 function json(data) {
-  this.setContentType('.json')
+  this.setMimeType('.json')
   this.body = JSON.stringify(data)
 }
 
@@ -252,7 +252,7 @@ class SimpleLessServer {
           })
           let suffix = path.extname(filepath)
 
-          setContentType.call(response, suffix)
+          setMimeType.call(response, suffix)
           readStream.pipe(response)
           readStream.on('error', err => {
             reject(err)
@@ -338,7 +338,7 @@ class SimpleLessServer {
       } = lessRoutes[i]
 
       if (regExp.test(request.pathname)) {
-        setContentType.call(response, '.txt')
+        setMimeType.call(response, '.txt')
         if (isFunction(func)) {
           return await func(request, response)
         } else {
@@ -363,7 +363,7 @@ class SimpleLessServer {
 
       response.status = status.bind(response)
       response.json = json.bind(response)
-      response.setContentType = setContentType.bind(response)
+      response.setMimeType = setMimeType.bind(response)
 
       this.ctx = {
         request,

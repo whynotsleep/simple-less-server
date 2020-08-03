@@ -34,7 +34,7 @@ function isRegExp(param) {
 }
 
 
-function getContentType(suffix, encoding = 'charset=UTF-8') {
+function getMimeType(suffix, encoding = 'charset=UTF-8') {
   let type = getMediaType(suffix)
 
   return encoding ? type + ';' + encoding : type
@@ -45,5 +45,5 @@ module.exports = {
   isFunction,
   isObject,
   isRegExp,
-  getContentType
+  getMimeType
 }

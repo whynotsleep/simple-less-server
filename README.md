@@ -4,6 +4,11 @@
 
 A simple server for developing static pages. You can enable proxy requests, or you can customize requests to return data
 
+## Install
+
+npm i simple-less-server
+
+
 + 接受到的请求暂时不会验证请求方法,例如get post patch等
 + 使用场景是，在开发几个简单的没有太多要求页面的时候，轻松配置一下就可以用服务器打开页面，简单写调用几个方法，就可以模拟真正接口获取数据
 
