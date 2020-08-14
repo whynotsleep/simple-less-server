@@ -8,7 +8,8 @@ const {
   isObject,
   isFunction,
   isRegExp,
-  getMimeType
+  getMimeType,
+  bufferConcat
 } = require('./utils.js')
 let config = require('./config.js')
 const Middleware = require('./middleware.js')
@@ -30,12 +31,18 @@ function status(code = 200) {
   }
 }
 
+function jsonParams() {
+  let params = null
+
+  try {
+    params = JSON.parse(this.body)
+  } catch (err) {}
+  return params
+}
 
 class SimpleLessServer {
   constructor(customConfig) {
     this.config = Object.assign({}, config, customConfig)
-    this.request = null
-    this.response = null
     this.lessRoutesCache = []
     this.lessRoutes = []
 
@@ -83,13 +90,6 @@ class SimpleLessServer {
     return this
   }
 
-  send(data, statusCode, statusMessage, encoding) {
-    this.response.statusCode = statusCode || 200
-    this.response.statusMessage = statusMessage || ''
-    this.response.end(data, encoding)
-    return this
-  }
-
   /**
    * 打开代理请求
    * @param {*} option 
@@ -104,7 +104,7 @@ class SimpleLessServer {
           data.push(chunk)
         })
         proxyResponse.on('end', () => {
-          response.body = data.join('')
+          response.body = bufferConcat(data)
           resolve()
         })
         response.writeHead(proxyResponse.statusCode, proxyResponse.headers)
@@ -130,7 +130,7 @@ class SimpleLessServer {
       pathRewrite
     } = matched
     let {
-      url,
+      url: requestUrl,
       method,
       headers
     } = request
@@ -145,14 +145,14 @@ class SimpleLessServer {
 
       if (keys.length > 0) {
         keys.forEach(regStr => {
-          url = url.replace(new RegExp(regStr), pathRewrite[regStr])
+          requestUrl = requestUrl.replace(new RegExp(regStr), pathRewrite[regStr])
         })
       }
     }
 
     if (referer) {
       headers.host = host
-      headers.referer = target + url
+      headers.referer = target + requestUrl
     }
 
     let options = {
@@ -160,7 +160,7 @@ class SimpleLessServer {
       host,
       port,
       method,
-      path: url,
+      path: requestUrl,
       headers
     }
     return options
@@ -200,12 +200,13 @@ class SimpleLessServer {
   acceptRequestData(request) {
     return new Promise((resolve, reject) => {
       let data = []
+
       request.on('data', chunk => {
         data.push(chunk)
       })
 
       request.on('end', () => {
-        resolve(data.join(''))
+        resolve(bufferConcat(data))
       })
       request.on('error', (err) => {
         reject(err)
@@ -232,7 +233,7 @@ class SimpleLessServer {
       let data = await this.acceptRequestData(ctx.request)
 
       request.body = data
-      request.params = querystring.parse(data)
+      request.params = JSON.parse(data)
       return await next()
     } catch (err) {
       console.error(err)
@@ -358,14 +359,12 @@ class SimpleLessServer {
     this.lessRoutesInit()
 
     const server = http.createServer((request, response) => {
-      this.request = request
-      this.response = response
-
+      request.params = jsonParams.bind(request)
       response.status = status.bind(response)
       response.json = json.bind(response)
       response.setMimeType = setMimeType.bind(response)
 
-      this.ctx = {
+      let ctx = {
         request,
         response
       }
@@ -375,15 +374,17 @@ class SimpleLessServer {
       }
 
       request.on('error', err => {
-        this.send(err.message, 500)
+        response.status(500)
+        response.end(err.message)
       })
 
-      this.mainProcessMiddleware.hander(this.ctx).then(res => {
-          this.response.end(this.response.body)
+      this.mainProcessMiddleware.hander(ctx).then(res => {
+          response.end(response.body)
         })
         .catch(err => {
           console.error(err)
-          this.send(err.message, 500)
+          response.status(500)
+          response.end(err.message)
         })
     })
 

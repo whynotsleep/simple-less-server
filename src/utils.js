@@ -40,10 +40,21 @@ function getMimeType(suffix, encoding = 'charset=UTF-8') {
   return encoding ? type + ';' + encoding : type
 }
 
+/**
+ * 合并buffer
+ * @param {*} buffers 
+ */
+function bufferConcat(buffers = []) {
+  const totalLength = buffers.reduce((len, item) => len + item.length, 0)
+
+  return Buffer.concat(buffers, totalLength)
+}
+
 module.exports = {
   dateFormat,
   isFunction,
   isObject,
   isRegExp,
-  getMimeType
+  getMimeType,
+  bufferConcat
 }
