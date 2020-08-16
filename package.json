@@ -1,6 +1,6 @@
 {
   "name": "simple-less-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple server for developing static pages. You can enable proxy requests, or you can customize requests to return data",
   "main": "index.js",
   "scripts": {
