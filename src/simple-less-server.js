@@ -31,11 +31,11 @@ function status(code = 200) {
   }
 }
 
-function jsonParams() {
+function jsonParams(data) {
   let params = null
 
   try {
-    params = JSON.parse(this.body)
+    params = JSON.parse(data)
   } catch (err) {}
   return params
 }
@@ -233,7 +233,7 @@ class SimpleLessServer {
       let data = await this.acceptRequestData(ctx.request)
 
       request.body = data
-      request.params = JSON.parse(data)
+      request.params = jsonParams(data)
       return await next()
     } catch (err) {
       console.error(err)
@@ -359,7 +359,6 @@ class SimpleLessServer {
     this.lessRoutesInit()
 
     const server = http.createServer((request, response) => {
-      request.params = jsonParams.bind(request)
       response.status = status.bind(response)
       response.json = json.bind(response)
       response.setMimeType = setMimeType.bind(response)
