@@ -2,14 +2,14 @@ const http = require('http')
 const fs = require('fs')
 const path = require('path')
 const url = require('url')
-const querystring = require('querystring')
 const {
   dateFormat,
   isObject,
   isFunction,
   isRegExp,
   getMimeType,
-  bufferConcat
+  bufferConcat,
+  jsonParams
 } = require('./utils.js')
 let config = require('./config.js')
 const Middleware = require('./middleware.js')
@@ -29,15 +29,6 @@ function status(code = 200) {
   if (code == 404) {
     this.statusMessage = 'not Found'
   }
-}
-
-function jsonParams(data) {
-  let params = null
-
-  try {
-    params = JSON.parse(data)
-  } catch (err) {}
-  return params
 }
 
 class SimpleLessServer {

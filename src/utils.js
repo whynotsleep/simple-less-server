@@ -50,11 +50,21 @@ function bufferConcat(buffers = []) {
   return Buffer.concat(buffers, totalLength)
 }
 
+function jsonParams(data) {
+  let params = null
+
+  try {
+    params = JSON.parse(data)
+  } catch (err) {}
+  return params
+}
+
 module.exports = {
   dateFormat,
   isFunction,
   isObject,
   isRegExp,
   getMimeType,
-  bufferConcat
+  bufferConcat,
+  jsonParams
 }
