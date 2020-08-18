@@ -1,17 +1,21 @@
 # simple-less-server
 
-用于开发静态页面的简单服务器。您可以启用代理请求，也可以自定义请求以返回数据
+用于开发静态页面的简单服务器。您可以启用代理请求，也可以自定义路由返回数据
 
-A simple server for developing static pages. You can enable proxy requests, or you can customize requests to return data
+A simple server for developing static pages. You can enable proxy requests, or you can customize the route to return data
 
-+ 接受到的请求暂时不会验证请求方法,例如get post patch等
-+ 使用场景是，在开发几个简单的没有太多要求页面的时候，轻松配置一下就可以用服务器打开页面，简单写调用几个方法，就可以模拟真正接口获取数据
++ 使用场景是，在开发几个轻量级页面的时候，简单配置就可以启用一个服务器
++ 这是一个与http请求方法无关的服务器，如果需要验证，你可以在路由函数中使用request.method进行自定义处理
++ 调用start后，路由的path如果是字符串会被处理成正则对象
++ 监听到请求后，会按序遍历路由，请求的url通过验证后就会停止遍历并执行路由函数
 
-+ 优先级：静态目录 > 代理拦截 > routeUse添加的路由 > 最后404
+## 处理优先级
+静态目录 > 代理拦截 > routeUse添加的路由 > 最后404
 
 ## Install
-
+```
 npm i simple-less-server
+```
 
 ## use:
 ```
