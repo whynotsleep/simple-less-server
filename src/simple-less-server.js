@@ -265,7 +265,8 @@ class SimpleLessServer {
    */
   async matchStatic(ctx, next) {
     let staticPath = this.staticPath
-    let filepath = ctx.request.path
+    let reqPath = ctx.request.path
+    let [filepath] = reqPath.split('?')
 
     if (filepath === '/') {
       filepath = path.join(staticPath, '/index.html')
