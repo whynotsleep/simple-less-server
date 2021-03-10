@@ -19,10 +19,24 @@ npm i simple-less-server
 
 ## use:
 ```
-let app = server({
+const path = require('path')
+
+app = server({
   port: 3000, //本地服务器启动端口
   log: true, //是否在控制台打印请求地址
-  staticPath: __dirname, //静态资源目录,
+  http: { //http服务器配置
+    open: true,
+    port: 3000,
+    option: {}
+  },
+  https: { //https服务器配置
+    open: true,
+    port: 3443,
+    key: path.join(__dirname, './key.pem'), //证书私钥key
+    cert: path.join(__dirname, './cert.pem'), //签名证书cert
+    option: {}
+  },
+  staticPath: __dirname, //静态资源目录
   proxyOpen: true, //代理是否开启
   proxyConfig: { //需要代理的目标对象，请求地址有/api都会代理，权重
     '/api': {
@@ -34,20 +48,33 @@ let app = server({
     }
   },
   lessRoutesCache: [{ //第一种路由初始化方法
-    path: '/hello', //路由地址
-    func: (request, response) => {response.body = 'hello world!'}
-  }] //路由
+      path: '/hello', //路由地址
+      func: (request, response) => {
+        response.body = 'hello world!'
+      }
+    },
+    { //第一种路由初始化方法
+      path: '/text', //路由地址
+      func: (request, response) => {
+        response.body = '一段中文文字'
+      }
+    }
+  ]
 })
 
-//第二种路由初始化方法
-// 简单的服务器,将结果写在body上，最后response.end()会把body上的数据写在里面
-// 或者直接用response.json(data)方法格式化传参生成json字符串返回
-app.routeUse('/api/test', (request, response) => {
-    response.body = "The request name is '"+ request.url +"'"
+app.routeUse('/test', (request, response) => {
+  response.body = "The request name is '/api/test'"
 })
-app.routeUse('/api/getList', (request, response) => {
-    response.status(200)
-    response.json({list: [1, null, true, 'abc', '文字']})
+app.routeUse('/getList', (request, response) => {
+  response.status(200)
+  response.json({
+    list: [1, null, true, 'abc', '文字']
+  })
+})
+
+app.routeUse('/error', (request, response) => {
+  response.status(500)
+  response.body = 'server error...'
 })
 
 app.start()

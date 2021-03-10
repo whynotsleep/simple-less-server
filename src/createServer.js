@@ -35,13 +35,13 @@ function createHttpsServer(config, callback) {
         if (config.key) {
             key = fs.readFileSync(config.key)
         } else {
-            log('https需要设置证书key地址')
+            log('https需要设置证书私钥key的地址')
         }
 
         if (config.cert) {
             cert = fs.readFileSync(config.cert)
         } else {
-            log('https需要设置证书cert地址')
+            log('https需要设置签名证书cert的地址')
         }
     } catch (err) {
         log('https证书读取错误')
