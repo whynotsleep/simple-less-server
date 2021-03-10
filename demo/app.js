@@ -1,8 +1,21 @@
 const server = require('../index.js')
+const path = require('path')
 
 app = server({
   port: 3000, //本地服务器启动端口
   log: true, //是否在控制台打印请求地址
+  http: {
+    open: true,
+    port: 3000,
+    option: {}
+  },
+  https: {
+    open: true,
+    port: 3443,
+    key: path.join(__dirname, './key.pem'),
+    cert: path.join(__dirname, './cert.pem'),
+    option: {}
+  },
   staticPath: __dirname, //静态资源目录
   proxyOpen: true, //代理是否开启
   proxyConfig: { //需要代理的目标对象，请求地址有/api都会代理，权重

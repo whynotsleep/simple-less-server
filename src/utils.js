@@ -1,7 +1,6 @@
 const getMediaType = require('./mediatype.js')
 
 function dateFormat(fmt = 'yyyy-MM-dd hh:mm:ss', date = new Date()) {
-
   let o = {
     'M+': date.getMonth() + 1,
     'd+': date.getDate(),
@@ -22,7 +21,7 @@ function dateFormat(fmt = 'yyyy-MM-dd hh:mm:ss', date = new Date()) {
 };
 
 function isFunction(param) {
-  return typeof(param) === 'function'
+  return typeof (param) === 'function'
 }
 
 function isObject(param) {
@@ -33,6 +32,9 @@ function isRegExp(param) {
   return Object.prototype.toString.call(param) === '[object RegExp]'
 }
 
+function isArray(param) {
+  return Array.isArray(param)
+}
 
 function getMimeType(suffix, encoding = 'charset=UTF-8') {
   let type = getMediaType(suffix)
@@ -59,6 +61,83 @@ function jsonParams(data) {
   return params
 }
 
+function deepClone(target) {
+  let temp;
+
+  if (typeof target === 'object') {
+    if (Array.isArray(target)) {
+      temp = [];
+      for (let k in target) {
+        temp.push(deepClone(target[k]))
+      }
+    } else if (target === null) {
+      temp = null;
+    } else if (target.constructor === RegExp) {
+      temp = target;
+    } else {
+      temp = {};
+      for (let k in target) {
+        temp[k] = deepClone(target[k]);
+      }
+    }
+  } else {
+    temp = target;
+  }
+  return temp;
+}
+
+function merge() {
+  var options, name, src, copy, copyIsArray, clone,
+    target = arguments[0] || {},
+    i = 1,
+    length = arguments.length,
+    deep = false;
+
+  if (typeof target === "boolean") {
+    deep = target;
+    target = arguments[1] || {};
+    i = 2;
+  }
+
+  if (typeof target !== "object" && !isFunction(target)) {
+    target = {};
+  }
+
+  if (length === i) {
+    target = this;
+    --i;
+  }
+
+  for (; i < length; i++) {
+    if ((options = arguments[i]) != null) {
+      for (name in options) {
+        src = target[name];
+        copy = options[name];
+
+        if (target === copy) {
+          continue;
+        }
+
+        if (deep && copy && (isObject(copy) || (copyIsArray = isArray(copy)))) {
+          if (copyIsArray) {
+            copyIsArray = false;
+            clone = src && isArray(src) ? src : [];
+          } else {
+            clone = src && isObject(src) ? src : {};
+          }
+
+          target[name] = merge(deep, clone, copy);
+
+        } else if (copy !== undefined) {
+          target[name] = copy;
+        }
+      }
+    }
+  }
+
+  return target;
+}
+
 module.exports = {
   dateFormat,
   isFunction,
@@ -66,5 +145,7 @@ module.exports = {
   isRegExp,
   getMimeType,
   bufferConcat,
-  jsonParams
+  jsonParams,
+  deepClone,
+  merge
 }

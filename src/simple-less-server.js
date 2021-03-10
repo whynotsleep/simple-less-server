@@ -1,7 +1,9 @@
 const http = require('http')
+const https = require('https')
 const fs = require('fs')
 const path = require('path')
 const url = require('url')
+const {createHttpServer, createHttpsServer} = require('./createServer')
 const {
   dateFormat,
   isObject,
@@ -9,7 +11,8 @@ const {
   isRegExp,
   getMimeType,
   bufferConcat,
-  jsonParams
+  jsonParams,
+  merge
 } = require('./utils.js')
 let config = require('./config.js')
 const Middleware = require('./middleware.js')
@@ -33,7 +36,7 @@ function status(code = 200) {
 
 class SimpleLessServer {
   constructor(customConfig) {
-    this.config = Object.assign({}, config, customConfig)
+    this.config = merge(true, {}, config, customConfig)
     this.lessRoutesCache = []
     this.lessRoutes = []
 
@@ -88,7 +91,8 @@ class SimpleLessServer {
    */
   openProxyRequest(request, response, option) {
     return new Promise((resolve, reject) => {
-      let proxyRequest = http.request(option, proxyResponse => {
+      const request = (option.protocol === 'https:' ? https : http).request
+      let proxyRequest = request(option, proxyResponse => {
         let data = []
 
         proxyResponse.on('data', (chunk) => {
@@ -342,50 +346,47 @@ class SimpleLessServer {
     return await next()
   }
 
-  start(callback) {
-    let {
-      log,
-      port,
-    } = this
+  exec(request, response) {
+    response.status = status.bind(response)
+    response.json = json.bind(response)
+    response.setMimeType = setMimeType.bind(response)
 
-    this.lessRoutesInit()
+    let ctx = {
+      request,
+      response
+    }
 
-    const server = http.createServer((request, response) => {
-      response.status = status.bind(response)
-      response.json = json.bind(response)
-      response.setMimeType = setMimeType.bind(response)
+    if (this.log) {
+      console.log(dateFormat(), '\x1B[32m', request.url, '\x1B[39m')
+    }
 
-      let ctx = {
-        request,
-        response
-      }
+    request.on('error', err => {
+      response.status(500)
+      response.end(err.message)
+    })
 
-      if (log) {
-        console.log(dateFormat(), '\x1B[32m', request.url, '\x1B[39m')
-      }
-
-      request.on('error', err => {
+    this.mainProcessMiddleware.hander(ctx).then(res => {
+        response.end(response.body)
+      })
+      .catch(err => {
+        console.error(err)
         response.status(500)
         response.end(err.message)
       })
+  }
 
-      this.mainProcessMiddleware.hander(ctx).then(res => {
-          response.end(response.body)
-        })
-        .catch(err => {
-          console.error(err)
-          response.status(500)
-          response.end(err.message)
-        })
-    })
+  start() {
+    let {http, https} = this
+    
+    this.lessRoutesInit()
 
-    this.server = server
-
-    callback = isFunction(callback) ? callback : () => {
-      console.log('\x1B[32m%s\x1B[39m', 'The proxy server is running...')
+    if(http && http.open) {
+      this.httpServer = createHttpServer(http, this.exec.bind(this))
     }
 
-    server.listen(port || 3000, callback)
+    if(https && https.open) {
+      this.httpsServer = createHttpsServer(https, this.exec.bind(this))
+    }
 
     return this
   }
