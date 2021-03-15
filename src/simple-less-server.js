@@ -87,9 +87,9 @@ class SimpleLessServer {
   /**
    * 打开代理请求
    * @param {*} option 
-   * @param {*} response 
+   * @param {*} res 
    */
-  openProxyRequest(request, response, option) {
+  openProxyRequest(req, res, option) {
     return new Promise((resolve, reject) => {
       const request = (option.protocol === 'https:' ? https : http).request
       let proxyRequest = request(option, proxyResponse => {
@@ -99,13 +99,13 @@ class SimpleLessServer {
           data.push(chunk)
         })
         proxyResponse.on('end', () => {
-          response.body = bufferConcat(data)
+          res.body = bufferConcat(data)
           resolve()
         })
-        response.writeHead(proxyResponse.statusCode, proxyResponse.headers)
+        res.writeHead(proxyResponse.statusCode, proxyResponse.headers)
       })
 
-      proxyRequest.end(request.body, 'binary')
+      proxyRequest.end(req.body, 'binary')
 
       proxyRequest.on('error', (err) => {
         reject(err)
